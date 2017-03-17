@@ -22,3 +22,11 @@ Example usage
 
   $ tail -f first.log second.log | colorize.py -t
 
+
+Demo
+====
+|demo|
+
+
+.. |demo| image:: https://asciinema.org/a/107700.png
+          :target: https://asciinema.org/a/107700?speed=2
