@@ -44,6 +44,7 @@ from __future__ import unicode_literals
 import sys
 import re
 import io
+import argparse
 
 from itertools import cycle
 try:
@@ -69,23 +70,20 @@ cyan   = create_color_func(36)
 grey   = create_color_func(37)
 white  = create_color_func(40, True)
 
-
-if __name__ == '__main__':
-    alternate_mode = tail_mode = False
-
-    if '-a' in sys.argv:
-        alternate_mode = True
-    elif '-t' in sys.argv:
-        tail_mode = True
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-a', '--alternate', help="alternate mode.", action="store_true", default=False)
+    parser.add_argument('-t', '--tail', help="tail mode.", action="store_true", default=False)
+    opts = parser.parse_args(sys.argv[1:])
 
     # change stdin and stdout to line buffered mode
     stdin = io.open(sys.stdin.fileno(), 'r', 1)
     stdout = io.open(sys.stdout.fileno(), 'w', 1)
 
-    if alternate_mode:
+    if opts.alternate:
         colors = cycle((grey, white))
         stdout.writelines(color(line) for color, line in zip(colors, stdin))
-    elif tail_mode:
+    elif opts.tail:
         colors = cycle((red, green, yellow, blue, purple, cyan, grey, white))
         path_to_color = {}   # dict to keep track of colors assigned to files
         color = next(colors)
@@ -105,3 +103,6 @@ if __name__ == '__main__':
             # - split the line into max_split parts and zip(colors, parts)
             for color, word in zip(colors, filter(None, re.split('(\S+\s+)', line, max_split))):
                 stdout.write(color(word))
+
+if __name__ == '__main__':
+    main()
