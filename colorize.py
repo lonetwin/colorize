@@ -1,23 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-colorize standard input by rows or (space separated) columns
-
-Example usage:
-
-output alternate rows in different colors
-  $ ls -l | colorize.py -a
-
-output each column from stdin in a different color
-  $ tail -f logfile | colorize.py
-
-output the first 3 columns in different colors and all subsequent text in one color
-  $ tail -f logfile | colorize.py 3
-
-filter the output of tail -f, coloring lines from each file in different color
-  $ tail -f first.log second.log | colorize.py -t
-"""
-
 # The MIT License (MIT)
 #
 # Copyright (c) 2017 Steven Fernandez
@@ -39,6 +21,10 @@ filter the output of tail -f, coloring lines from each file in different color
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+
+"""
+colorize standard input by rows or (space separated) columns
+"""
 
 from __future__ import unicode_literals
 import argparse
