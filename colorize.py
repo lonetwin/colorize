@@ -41,10 +41,10 @@ filter the output of tail -f, coloring lines from each file in different color
 # SOFTWARE.
 
 from __future__ import unicode_literals
-import sys
-import re
-import io
 import argparse
+import io
+import re
+import sys
 
 from itertools import cycle
 try:
@@ -52,39 +52,69 @@ try:
 except ImportError:
     pass
 
-__version__ = "0.1"
+__version__ = "0.2"
 
-def create_color_func(code, bold=False):
-    def color_func(text):
-        code_str = '1;{}'.format(code) if bold else code
-        return "\033[{}m{}\033[0m".format(code_str, text)
-    return color_func
 
-# add any colors you might need.
-red    = create_color_func(31)
-green  = create_color_func(32)
-yellow = create_color_func(33)
-blue   = create_color_func(34)
-purple = create_color_func(35)
-cyan   = create_color_func(36)
-grey   = create_color_func(37)
-white  = create_color_func(40, True)
+class Colors(object):
+    """Namespace to hold colors function definitions
+    """
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-a', '--alternate', help="alternate mode.", action="store_true", default=False)
-    parser.add_argument('-t', '--tail', help="tail mode.", action="store_true", default=False)
-    opts = parser.parse_args(sys.argv[1:])
+    __slots__ = []
+
+    def _create_color_func(code, bold=False):
+        def color_func(text):
+            code_str = '1;{}'.format(code) if bold else code
+            return "\033[{}m{}\033[0m".format(code_str, text)
+        return color_func
+
+    # add any colors you might need.
+    red = staticmethod(_create_color_func(31))
+    green = staticmethod(_create_color_func(32))
+    yellow = staticmethod(_create_color_func(33))
+    blue = staticmethod(_create_color_func(34))
+    purple = staticmethod(_create_color_func(35))
+    cyan = staticmethod(_create_color_func(36))
+    grey = staticmethod(_create_color_func(37))
+    white = staticmethod(_create_color_func(40, True))
+
+
+class HelpFormatterMixin(argparse.RawDescriptionHelpFormatter,
+                         argparse.ArgumentDefaultsHelpFormatter):
+    pass
+
+
+def main(args):
+    supported_colors = sorted(name for name in dir(Colors)
+                              if callable(getattr(Colors, name)) and not name.startswith('_'))
+
+    parser = argparse.ArgumentParser(description="Colorize standard input by rows or (space separated) columns."
+                                                 " Default mode is to color columns.",
+                                     epilog="These colors are supported: %s" % ', '.join(
+                                         getattr(Colors, name)(name) for name in supported_colors),
+                                     formatter_class=HelpFormatterMixin)
+
+    group = parser.add_mutually_exclusive_group()
+
+    group.add_argument('-c', '--column-colors', help="colors to use for column mode.", nargs="?",
+                       type=lambda o: o.split(','), const=",".join(supported_colors),
+                       default=",".join(supported_colors), metavar="color,color...")
+    group.add_argument('-a', '--alternate', help="alternate mode.", nargs="?", type=lambda o: o.split(','),
+                       default=False, const='white,grey', metavar="color,color...")
+    group.add_argument('-t', '--tail', help="tail mode.", nargs="?", type=lambda o: o.split(','),
+                       default=False, const=",".join(supported_colors), metavar="color,color...")
+    parser.add_argument('max_colors', nargs='?', default=0, type=int)
+
+    opts = parser.parse_args(args)
 
     # change stdin and stdout to line buffered mode
     stdin = io.open(sys.stdin.fileno(), 'r', 1)
     stdout = io.open(sys.stdout.fileno(), 'w', 1)
 
     if opts.alternate:
-        colors = cycle((grey, white))
+        colors = cycle(getattr(Colors, color) for color in (opts.alternate or supported_colors))
         stdout.writelines(color(line) for color, line in zip(colors, stdin))
     elif opts.tail:
-        colors = cycle((red, green, yellow, blue, purple, cyan, grey, white))
+        colors = cycle(getattr(Colors, color) for color in (opts.tail or supported_colors))
         path_to_color = {}   # dict to keep track of colors assigned to files
         color = next(colors)
         for line in stdin:
@@ -96,13 +126,12 @@ def main():
             stdout.write(color(line))
     else:
         # default column coloring mode
-        max_split = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 0
         for line in stdin:
             # - start new color cycle for each line
-            colors = cycle((red, green, yellow, blue, purple, cyan, grey, white))
+            colors = cycle(getattr(Colors, color) for color in (opts.column_colors or supported_colors))
             # - split the line into max_split parts and zip(colors, parts)
-            for color, word in zip(colors, filter(None, re.split('(\S+\s+)', line, max_split))):
+            for color, word in zip(colors, filter(None, re.split(r'(\S+\s+)', line, opts.max_colors))):
                 stdout.write(color(word))
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
