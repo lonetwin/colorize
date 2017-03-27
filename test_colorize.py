@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import doctest
 import unittest
 from subprocess import Popen, PIPE
 
-from colorize import Colors
+import colorize
+
+Colors = colorize.Colors
+
 
 class TestColorize(unittest.TestCase):
 
@@ -55,6 +59,38 @@ class TestColorize(unittest.TestCase):
         ])
         self.check([self.exe, "-c", "red,green", "1"], expected)
 
+    def test_only_widths(self):
+        expected = "".join([
+            Colors.blue("aaa bb") + Colors.cyan("b ") + Colors.blue("ccc ddd\n"),
+            Colors.blue("AAA BB") + Colors.cyan("B ") + Colors.blue("CCC DDD\n"),
+            Colors.blue("000 11") + Colors.cyan("1 ") + Colors.blue("222 333"),
+        ])
+        self.check([self.exe, "-c", ":6,"], expected)
+
+    def test_width_and_max_colors(self):
+        expected = "".join([
+            Colors.blue("aaa bb") + Colors.cyan("b ccc ddd\n"),
+            Colors.blue("AAA BB") + Colors.cyan("B CCC DDD\n"),
+            Colors.blue("000 11") + Colors.cyan("1 222 333"),
+        ])
+        self.check([self.exe, "-c", ":6,", "2"], expected)
+
+    def test_width_and_custom_colors(self):
+        expected = "".join([
+            Colors.blue("aaa bb") + Colors.red("b c") + Colors.yellow("cc ") + Colors.blue("ddd\n"),
+            Colors.blue("AAA BB") + Colors.red("B C") + Colors.yellow("CC ") + Colors.blue("DDD\n"),
+            Colors.blue("000 11") + Colors.red("1 2") + Colors.yellow("22 ") + Colors.blue("333"),
+        ])
+        self.check([self.exe, "-c", ":6,red:3,yellow"], expected)
+
+    def test_width_custom_colors_and_max_colors(self):
+        expected = "".join([
+            Colors.blue("aaa bb") + Colors.red("b c") + Colors.yellow("cc ddd\n"),
+            Colors.blue("AAA BB") + Colors.red("B C") + Colors.yellow("CC DDD\n"),
+            Colors.blue("000 11") + Colors.red("1 2") + Colors.yellow("22 333"),
+        ])
+        self.check([self.exe, "-c", ":6,red:3,yellow", "3"], expected)
+
     def test_alternate_mode(self):
         expected = "".join([
             Colors.white("aaa bbb ccc ddd\n"),
@@ -97,6 +133,10 @@ class TestColorize(unittest.TestCase):
         ])
         self.check([self.exe, "-t"], expected, input_lines)
 
+
+def load_tests(loader, tests, ignore):
+    tests.addTests(doctest.DocTestSuite(colorize))
+    return tests
 
 if __name__ == '__main__':
     unittest.main()
