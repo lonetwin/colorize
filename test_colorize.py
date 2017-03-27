@@ -16,9 +16,10 @@ class TestColorize(unittest.TestCase):
         self.proc.terminate()
         self.proc.wait()
 
-    def check(self, cmdline, expected):
+    def check(self, cmdline, expected, input_lines=None):
+        input_lines = input_lines if input_lines else self.input_lines
         self.proc = Popen(cmdline, stdin=PIPE, stdout=PIPE, universal_newlines=True)
-        self.proc.stdin.write(self.input_lines)
+        self.proc.stdin.write(input_lines)
         self.proc.stdin.close()
         self.assertEqual(self.proc.stdout.read(), expected)
 
@@ -69,6 +70,32 @@ class TestColorize(unittest.TestCase):
             Colors.red("000 111 222 333")
         ])
         self.check([self.exe, "-a", "red,green"], expected)
+
+    def test_tailf_mode(self):
+        self.maxDiff = None
+        input_lines = "\n".join([
+            "==> /path/to/first.log <==",
+            "",
+            "2015-01-01 00:00:01 [INFO] Something odd happened here",
+            "2015-01-01 00:00:01 [INFO] Something odd happened here",
+            "",
+            "==> /path/to/second.log <==",
+            "",
+            "2015-01-01 00:00:01 [INFO] Something odd happened here",
+            "2015-01-01 00:00:01 [INFO] Something odd happened here",
+        ])
+        expected = "".join([
+            Colors.cyan("==> /path/to/first.log <==\n"),
+            Colors.cyan("\n"),
+            Colors.cyan("2015-01-01 00:00:01 [INFO] Something odd happened here\n"),
+            Colors.cyan("2015-01-01 00:00:01 [INFO] Something odd happened here\n"),
+            Colors.cyan("\n"),
+            Colors.green("==> /path/to/second.log <==\n"),
+            Colors.green("\n"),
+            Colors.green("2015-01-01 00:00:01 [INFO] Something odd happened here\n"),
+            Colors.green("2015-01-01 00:00:01 [INFO] Something odd happened here"),
+        ])
+        self.check([self.exe, "-t"], expected, input_lines)
 
 
 if __name__ == '__main__':
