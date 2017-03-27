@@ -21,7 +21,9 @@ Example usage
   $ tail -f logfile | colorize.py 3
   $ tail -f logfile | colorize.py -c green,blue,red 3
 
-* output the columns specified by widths in different colors::
+* output the columns specified by widths in different colors
+
+::
 
   # - The first 10 characters is green, the next 12 in red, followed by space
   # separated columns alternating in green and red
