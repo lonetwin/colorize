@@ -48,5 +48,15 @@ Demo
 |demo|
 
 
+Usage Tip
+=========
+
+If you use `bash`, you can create colorized versions of commands, like::
+
+    function ctail() { tail $@ | colorize.py -t; }
+    function cll() { ls -l $@ | colorize.py 8; }
+    function cvmstat() { vmstat $@ | colorize.py -a red,green; }
+
+
 .. |demo| image:: https://asciinema.org/a/107799.png
           :target: https://asciinema.org/a/107799?speed=2
