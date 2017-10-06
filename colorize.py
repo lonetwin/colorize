@@ -175,10 +175,14 @@ def main(args):
         for line in stdin:
             # - start new color cycle for each line
             default_colors = iter(supported_colors)
-            colors = cycle(getattr(Colors, (color or next(default_colors))) for color in column_colors)
+            colors = cycle(color_func(name or next(default_colors)) for name in column_colors)
             # - split the line into max_split parts and zip(colors, parts)
             for color, word in zip(colors, filter(None, split_func(line))):
                 stdout.write(color(word))
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    try:
+        main(sys.argv[1:])
+    except KeyboardInterrupt:
+        # avoid printing the traceback when tail mode is interrupted
+        pass
