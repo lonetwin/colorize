@@ -48,10 +48,11 @@ class Colors(object):
 
     __slots__ = []
 
-    def _create_color_func(code, bold=False):
+    def _create_color_func(code, bold=True):
         def color_func(text):
-            code_str = '1;{}'.format(code) if bold else code
-            return "\033[{}m{}\033[0m".format(code_str, text)
+            reset = '\033[0m'
+            color = '\033[{0}{1}m'.format('1;' if bold else '', code)
+            return "{color}{text}{reset}".format(**vars())
         return color_func
 
     # add any colors you might need.
@@ -62,7 +63,7 @@ class Colors(object):
     purple = staticmethod(_create_color_func(35))
     cyan = staticmethod(_create_color_func(36))
     grey = staticmethod(_create_color_func(37))
-    white = staticmethod(_create_color_func(40, True))
+    white = staticmethod(_create_color_func(40))
 
 
 class HelpFormatterMixin(argparse.RawDescriptionHelpFormatter,
@@ -118,11 +119,10 @@ def split_by_widths(input_string, widths, maxsplit=None):
 
 def main(args):
     color_func = functools.partial(getattr, Colors)
+    supported_colors = sorted(name for name, value in Colors.__dict__.items()
+                              if type(value) == staticmethod)
 
-    supported_colors = sorted(name for name in dir(Colors)
-                              if callable(color_func(name)) and not name.startswith('_'))
-
-    parser = argparse.ArgumentParser(description="Colorize standard input by rows or (space separated) columns."
+    parser = argparse.ArgumentParser(description="Colorize standard input by rows or columns."
                                                  " Default mode is to color columns.",
                                      epilog="These colors are supported: %s" % ', '.join(
                                          color_func(name)(name) for name in supported_colors),
@@ -132,17 +132,21 @@ def main(args):
 
     group.add_argument('-c', '--column-colors',  nargs="?", type=lambda o: o.split(','),
                        const=",".join(supported_colors), default=",".join(supported_colors),
-                       metavar="color,color...",
+                       metavar="color,...",
                        help=("colors to use for column mode, in the order specified. "
                              "Column widths can be provided as a suffix separated by a `:`"
                              " (eg: red:10,blue,green:20...).")
                       )
+    parser.add_argument('-d', '--delimiter', nargs=1, type=str,
+                        help="delimiter to use in column mode instead of whitespace.")
+    parser.add_argument('max_colors', nargs='?', default=0, type=int,
+                        help="Limit to using these many colors (< {})".format(len(supported_colors)))
 
-    group.add_argument('-a', '--alternate', help="alternate mode.", nargs="?", type=lambda o: o.split(','),
-                       default=False, const='white,grey', metavar="color,color...")
+    group.add_argument('-a', '--alternate', help="alternate line mode.", nargs="?", type=lambda o: o.split(','),
+                       default=False, const='white,grey', metavar="color,...")
     group.add_argument('-t', '--tail', help="tail mode.", nargs="?", type=lambda o: o.split(','),
-                       default=False, const=",".join(supported_colors), metavar="color,color...")
-    parser.add_argument('max_colors', nargs='?', default=0, type=int)
+                       default=False, const=",".join(supported_colors), metavar="color,...")
+
 
     opts = parser.parse_args(args)
 
@@ -150,41 +154,52 @@ def main(args):
     stdin = io.open(sys.stdin.fileno(), 'r', 1)
     stdout = io.open(sys.stdout.fileno(), 'w', 1)
 
+    pallete = cycle(color_func(name) for name in (opts.alternate or supported_colors))
     if opts.alternate:
-        colors = cycle(color_func(name) for name in (opts.alternate or supported_colors))
-        stdout.writelines(color(line) for color, line in zip(colors, stdin))
+        # row coloring mode
+        stdout.writelines(color(line) for color, line in zip(pallete, stdin))
     elif opts.tail:
-        colors = cycle(color_func(name) for name in (opts.tail or supported_colors))
+        # tail command output coloring mode
         path_to_color = {}   # dict to keep track of colors assigned to files
-        color = next(colors)
+        color = next(pallete)
         for line in stdin:
-            if line.startswith("==> "):
+            if line.startswith('==> ') and line.endswith(' <==\n'):
                 path = line.split()[1]
                 # - get the color assigned to this path or set a new one
                 # if one hasn't been assigned yet
-                color = path_to_color.setdefault(path, next(colors))
+                color = path_to_color.setdefault(path, next(pallete))
             stdout.write(color(line))
     else:
+        # default column coloring mode
         column_colors = opts.column_colors or supported_colors
         if any(':' in option for option in column_colors):
             # - split by width
-            column_colors, widths = zip(*((color, int(width or 0)) for opt in column_colors for color, _, width in [opt.partition(':')]))
+            column_colors, widths = zip(
+                *(
+                    (color, int(width or 0))
+                    for opt in column_colors
+                    for color, _, width in [opt.partition(':')]
+                )
+            )
             split_func = functools.partial(split_by_widths, widths=widths, maxsplit=opts.max_colors)
         else:
-            split_func = functools.partial(re.split, r'(\S+\s+)', maxsplit=opts.max_colors)
+            pattern = r'(.+?{0})'.format(opts.delimiter) if opts.delimiter else r'(\S+\s+)'
+            split_func = functools.partial(re.split, pattern, maxsplit=opts.max_colors)
 
-        # default column coloring mode
         for line in stdin:
-            # - start new color cycle for each line
-            default_colors = iter(supported_colors)
-            colors = cycle(color_func(name or next(default_colors)) for name in column_colors)
-            # - split the line into max_split parts and zip(colors, parts)
-            for color, word in zip(colors, filter(None, split_func(line))):
+            # - reset the color pallete for each line, also use a next
+            # default color from supported_colors for any column without
+            # an explicitly specified color.
+            default = iter(supported_colors)
+            pallete = cycle(color_func(name or next(default)) for name in column_colors)
+            # - split the line into max_split parts and zip(pallete, parts)
+            for color, word in zip(pallete, filter(None, split_func(line))):
                 stdout.write(color(word))
+
 
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except KeyboardInterrupt:
-        # avoid printing the traceback when tail mode is interrupted
+        # avoid printing the traceback on KeyboardInterrupt
         pass
