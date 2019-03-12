@@ -23,7 +23,7 @@
 # SOFTWARE.
 
 """
-colorize standard input by rows or (space separated) columns
+colorize standard input by rows or columns
 """
 
 from __future__ import unicode_literals
@@ -42,28 +42,33 @@ except ImportError:
 __version__ = "0.4"
 
 
-class Colors(object):
-    """Namespace to hold colors function definitions
-    """
+def _create_color_func(code, bold=True):
+    def color_func(text):
+        reset = '\033[0m'
+        color = '\033[{0}{1}m'.format('1;' if bold else '', code)
+        return "{color}{text}{reset}".format(**vars())
+    return color_func
 
-    __slots__ = []
 
-    def _create_color_func(code, bold=True):
-        def color_func(text):
-            reset = '\033[0m'
-            color = '\033[{0}{1}m'.format('1;' if bold else '', code)
-            return "{color}{text}{reset}".format(**vars())
-        return color_func
-
+colors = {
     # add any colors you might need.
-    red = staticmethod(_create_color_func(31))
-    green = staticmethod(_create_color_func(32))
-    yellow = staticmethod(_create_color_func(33))
-    blue = staticmethod(_create_color_func(34))
-    purple = staticmethod(_create_color_func(35))
-    cyan = staticmethod(_create_color_func(36))
-    grey = staticmethod(_create_color_func(37))
-    white = staticmethod(_create_color_func(40))
+    name: _create_color_func(idx)
+    for idx, name in enumerate(
+        ('red', 'green', 'yellow', 'blue', 'purple', 'cyan', 'grey', 'white'),
+        31
+    )
+}
+
+
+# XXX compatibility workaround: This exists simply for the tests which
+# were based on an earlier scheme where the color functions belonged to
+# a class based namespace
+class Colors(object):
+    pass
+
+
+for name, func in colors.items():
+    setattr(Colors, name, staticmethod(func))
 
 
 class HelpFormatterMixin(argparse.RawDescriptionHelpFormatter,
@@ -106,7 +111,7 @@ def split_by_widths(input_string, widths, maxsplit=None):
         if width:
             substr = input_string[start:start+width]
         else:
-            matches = re.split('(\s*\S+\s+)', input_string[start:], maxsplit=1)
+            matches = re.split(r'(\s*\S+\s+)', input_string[start:], maxsplit=1)
             substr = ''.join(matches[:2]) if len(matches) > 2 else ''.join(matches)
             width = len(substr)
         yield substr
@@ -118,9 +123,8 @@ def split_by_widths(input_string, widths, maxsplit=None):
 
 
 def main(args):
-    color_func = functools.partial(getattr, Colors)
-    supported_colors = sorted(name for name, value in Colors.__dict__.items()
-                              if type(value) == staticmethod)
+    color_func = colors.get
+    supported_colors = sorted(colors.keys())
 
     parser = argparse.ArgumentParser(description="Colorize standard input by rows or columns."
                                                  " Default mode is to color columns.",
@@ -146,7 +150,6 @@ def main(args):
                        default=False, const='white,grey', metavar="color,...")
     group.add_argument('-t', '--tail', help="tail mode.", nargs="?", type=lambda o: o.split(','),
                        default=False, const=",".join(supported_colors), metavar="color,...")
-
 
     opts = parser.parse_args(args)
 
